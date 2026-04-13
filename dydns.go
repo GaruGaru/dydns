@@ -24,28 +24,32 @@ func main() {
 		ip.NewPlainIPProvider("http://myexternalip.com/raw"),
 	)
 
-	var options = providers.Options{
-		Domain:   os.Getenv("DOMAIN"),
-		Entries:  strings.Split(os.Getenv("ENTRIES"), ","),
-		Password: os.Getenv("PASSWORD"),
-	}
+	porkApiKey := os.Getenv("PORK_API_KEY")
+	porkApiSecret := os.Getenv("PORK_API_SECRET")
+	porkDomainID := os.Getenv("PORK_API_DOMAIN_ID")
+	records := strings.Split(os.Getenv("RECORDS"), ",")
 
-	if len(options.Password) == 0 {
-		logger.Error("password is required")
+	if len(porkApiKey) == 0 {
+		logger.Error("PORK_API_KEY is required")
 		os.Exit(1)
 	}
 
-	if len(options.Entries) == 0 {
-		logger.Error("atleast 1 entry is required")
+	if len(porkApiSecret) == 0 {
+		logger.Error("PORK_API_SECRET is required")
 		os.Exit(1)
 	}
 
-	if len(options.Domain) == 0 {
-		logger.Error("domain is required")
+	if len(porkDomainID) == 0 {
+		logger.Error("PORK_API_DOMAIN_ID is required")
 		os.Exit(1)
 	}
 
-	delay := 60 * time.Second
+	if len(records) == 0 {
+		logger.Error("RECORDS is required")
+		os.Exit(1)
+	}
+
+	delay := 5 * time.Minute
 
 	delayEnv := os.Getenv("DELAY")
 	var err error
@@ -57,8 +61,8 @@ func main() {
 		}
 	}
 
-	dnsClient := providers.NewDnsClient()
-	logger.Info("Starting dydns", "domain", options.Domain, "entries", len(options.Entries))
+	dnsClient := providers.NewPorkbun(porkApiKey, porkApiSecret, porkDomainID, records)
+	logger.Info("started dydns")
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -88,12 +92,12 @@ func main() {
 				}
 
 				logger.Info("got IP", "ip", externalIP)
-				err = dnsClient.Update(ctx, options, externalIP)
+				err = dnsClient.Update(ctx, externalIP)
 				if err != nil {
 					logger.Warn("error updating DNS record", "error", err)
 					continue
 				}
-				logger.Info("updated DNS records", "count", len(options.Entries))
+				logger.Info("updated DNS records")
 			}
 		}
 	}()
