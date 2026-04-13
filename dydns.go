@@ -79,6 +79,7 @@ func main() {
 	defer ticker.Stop()
 
 	go func() {
+		var lastIP string
 		for {
 			select {
 			case <-ctx.Done():
@@ -92,11 +93,18 @@ func main() {
 				}
 
 				logger.Info("got IP", "ip", externalIP)
-				err = dnsClient.Update(ctx, externalIP)
-				if err != nil {
-					logger.Warn("error updating DNS record", "error", err)
+
+				if externalIP == lastIP {
+					// skip redundant updates
 					continue
 				}
+
+				err = dnsClient.Update(ctx, externalIP)
+				if err != nil {
+					logger.Error("error updating DNS record", "error", err)
+					continue
+				}
+				lastIP = externalIP
 				logger.Info("updated DNS records")
 			}
 		}
