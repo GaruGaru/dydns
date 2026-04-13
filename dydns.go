@@ -2,47 +2,47 @@ package main
 
 import (
 	"context"
-	"github.com/garugaru/DyDns/ip"
-	"github.com/garugaru/DyDns/namecheap"
-	"github.com/rs/zerolog"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/garugaru/DyDns/ip"
+	"github.com/garugaru/DyDns/providers"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
-		With().
-		Ctx(ctx).
-		Timestamp().
-		Logger()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	var ipProvider = ip.Providers(
 		ip.NewPlainIPProvider("https://api.ipify.org/"),
 		ip.NewPlainIPProvider("http://myexternalip.com/raw"),
 	)
 
-	var options = namecheap.Options{
+	var options = providers.Options{
 		Domain:   os.Getenv("DOMAIN"),
 		Entries:  strings.Split(os.Getenv("ENTRIES"), ","),
 		Password: os.Getenv("PASSWORD"),
 	}
 
 	if len(options.Password) == 0 {
-		logger.Fatal().Msg("password is required")
+		logger.Error("password is required")
+		os.Exit(1)
 	}
 
 	if len(options.Entries) == 0 {
-		logger.Fatal().Msg("atleast 1 entry is required")
+		logger.Error("atleast 1 entry is required")
+		os.Exit(1)
 	}
 
 	if len(options.Domain) == 0 {
-		logger.Fatal().Msg("domain is required")
+		logger.Error("domain is required")
+		os.Exit(1)
 	}
 
 	delay := 60 * time.Second
@@ -52,12 +52,13 @@ func main() {
 	if len(delayEnv) != 0 {
 		delay, err = time.ParseDuration(delayEnv)
 		if err != nil {
-			logger.Fatal().Err(err).Msg("failed to parse delay")
+			logger.Error("failed to parse delay", "error", err)
+			os.Exit(1)
 		}
 	}
 
-	dnsClient := namecheap.NewDnsClient()
-	logger.Info().Msgf("Starting dydns on domain %s with %d entries", options.Domain, len(options.Entries))
+	dnsClient := providers.NewDnsClient()
+	logger.Info("Starting dydns", "domain", options.Domain, "entries", len(options.Entries))
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -65,7 +66,7 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		logger.Warn().Str("signal", sig.String()).Msg("received signal")
+		logger.Warn("received signal", "signal", sig.String())
 		cancel()
 		done <- true
 	}()
@@ -77,26 +78,26 @@ func main() {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Info().Msg("context done, exiting")
+				logger.Info("context done, exiting")
 				return
 			case <-ticker.C:
 				externalIP, err := ipProvider.IP(ctx)
 				if err != nil {
-					logger.Warn().Err(err).Msg("error retrieving external IP")
+					logger.Warn("error retrieving external IP", "error", err)
 					continue
 				}
 
-				logger.Info().Str("ip", externalIP).Msg("got IP")
+				logger.Info("got IP", "ip", externalIP)
 				err = dnsClient.Update(ctx, options, externalIP)
 				if err != nil {
-					logger.Warn().Err(err).Msg("error updating DNS record")
+					logger.Warn("error updating DNS record", "error", err)
 					continue
 				}
-				logger.Info().Msgf("updated %d DNS record", len(options.Entries))
+				logger.Info("updated DNS records", "count", len(options.Entries))
 			}
 		}
 	}()
 
 	<-done
-	logger.Info().Msg("dydns exiting")
+	logger.Info("dydns exiting")
 }

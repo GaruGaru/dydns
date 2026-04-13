@@ -3,10 +3,8 @@ package ip
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
 	"io"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -21,18 +19,10 @@ type MultiProvider struct {
 }
 
 func (p MultiProvider) IP(ctx context.Context) (string, error) {
-	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
-		With().
-		Ctx(ctx).
-		Timestamp().
-		Logger()
-
 	for _, provider := range p.Providers {
 		ip, err := provider.IP(ctx)
 		if err == nil {
 			return ip, nil
-		} else {
-			logger.Warn().Err(err).Msgf("failed to get ip from %s", provider.Name())
 		}
 	}
 

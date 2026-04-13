@@ -1,4 +1,4 @@
-package namecheap
+package providers
 
 import (
 	"context"
@@ -13,17 +13,17 @@ type Options struct {
 	Password string
 }
 
-func NewDnsClient() *DnsClient {
-	return &DnsClient{
+func NewNamecheap() *NamecheapClient {
+	return &NamecheapClient{
 		client: &http.Client{Timeout: time.Second * 15},
 	}
 }
 
-type DnsClient struct {
+type NamecheapClient struct {
 	client *http.Client
 }
 
-func (c *DnsClient) Update(ctx context.Context, options Options, ip string) error {
+func (c *NamecheapClient) Update(ctx context.Context, options Options, ip string) error {
 	for _, entry := range options.Entries {
 		url := fmt.Sprintf(
 			"https://dynamicdns.park-your-domain.com/update?domain=%s&host=%s&password=%s&ip=%s",
