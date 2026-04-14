@@ -27,7 +27,7 @@ func main() {
 	porkApiKey := os.Getenv("PORK_API_KEY")
 	porkApiSecret := os.Getenv("PORK_API_SECRET")
 	porkDomainID := os.Getenv("PORK_API_DOMAIN_ID")
-	records := strings.Split(os.Getenv("RECORDS"), ",")
+	records := os.Getenv("RECORDS")
 
 	if len(porkApiKey) == 0 {
 		logger.Error("PORK_API_KEY is required")
@@ -61,7 +61,7 @@ func main() {
 		}
 	}
 
-	dnsClient := providers.NewPorkbun(porkApiKey, porkApiSecret, porkDomainID, records)
+	dnsClient := providers.NewPorkbun(porkApiKey, porkApiSecret, porkDomainID, strings.Split(records, ","))
 	logger.Info("started dydns")
 
 	sigs := make(chan os.Signal, 1)
